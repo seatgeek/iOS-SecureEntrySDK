@@ -111,10 +111,7 @@ internal struct SecureEntryConstants {
 	fileprivate var errorView: UIView?
 	fileprivate var errorIcon: UIImageView?
 	fileprivate var errorLabel: UILabel?
-	fileprivate var scanAnimBox: UIView?
-	fileprivate var scanAnimLine: UIView?
 	fileprivate var timer: Timer? = nil
-	fileprivate var toggleTimer: Timer? = nil
 	fileprivate var type: BarcodeType = .pdf417
 	
 	@IBInspectable fileprivate var livePreview: Bool {
@@ -145,12 +142,6 @@ internal struct SecureEntryConstants {
 		}
 		set {
 			self.brandingColorInternal = newValue
-			if let scanAnimBox = scanAnimBox {
-				scanAnimBox.backgroundColor = (brandingColorInternal ?? UIColor.blue).withAlphaComponent(0.5)
-			}
-			if let scanAnimLine = scanAnimLine {
-				scanAnimLine.backgroundColor = (brandingColorInternal ?? UIColor.blue)
-			}
 		}
 	}
 	
@@ -365,8 +356,6 @@ internal struct SecureEntryConstants {
 			guard let fullMessage = self.fullMessage, let segmentType = self.entryData?.getSegmentType() else {
 				self.retImageView?.image = nil
 				self.staticImageView?.image = nil
-				self.scanAnimBox?.isHidden = true
-				self.scanAnimLine?.isHidden = true
 				return
 			}
 			#else
@@ -395,14 +384,10 @@ internal struct SecureEntryConstants {
 						
 						// Apply the image
 						retImageView.image = imageWithInsets
-						self.scanAnimBox?.isHidden = false
-						self.scanAnimLine?.isHidden = false
 						
 						self.flipped = !self.flipped
 					} else {
 						retImageView.image = nil
-						self.scanAnimBox?.isHidden = true
-						self.scanAnimLine?.isHidden = true
 						return
 					}
 				}
@@ -442,10 +427,6 @@ internal struct SecureEntryConstants {
 	}
 	
 	@objc fileprivate func toggleMode(_ sender: AnyObject) {
-		// Invalidate any existing timer
-		self.toggleTimer?.invalidate()
-		self.toggleTimer = nil
-		
 		// Only rotating symbology may be toggled
 		if self.entryData?.getSegmentType() == .ROTATING_SYMBOLOGY {
 			self.toggleStatic = !self.toggleStatic
@@ -467,8 +448,6 @@ internal struct SecureEntryConstants {
                 self.retImageView?.isHidden = false
                 self.retImageView?.alpha = 1
                 self.retImageView?.center.y = ( self.outerView?.bounds.size.height ?? 0 ) / 2
-                self.scanAnimBox?.isHidden = true
-                self.scanAnimLine?.isHidden = true
                 self.staticImageView?.isHidden = false
                 self.staticImageView?.alpha = 0
                 self.staticImageView?.center.y = ( self.outerView?.bounds.size.height ?? 0 ) * 2
@@ -485,11 +464,6 @@ internal struct SecureEntryConstants {
 					if true == self.toggleStatic {
 						//self.stopAnimation()
 						self.update()
-						
-						self.toggleTimer?.invalidate()
-                        self.toggleTimer = Timer.scheduledTimer(withTimeInterval: 10.0, repeats: false, block: { [weak self] (_) in
-                            self?.toggleModeOff()
-                        })
 					}
                 })
             } else {
@@ -498,8 +472,6 @@ internal struct SecureEntryConstants {
                 self.retImageView?.isHidden = false
                 self.retImageView?.alpha = 0
                 self.retImageView?.center.y = ( self.outerView?.bounds.size.height ?? 0 ) * 2
-                self.scanAnimBox?.isHidden = true
-                self.scanAnimLine?.isHidden = true
                 self.staticImageView?.isHidden = false
                 self.staticImageView?.alpha = 1
                 self.staticImageView?.center.y = ( self.outerView?.bounds.size.height ?? 0 ) / 2
@@ -513,9 +485,7 @@ internal struct SecureEntryConstants {
                     self.staticImageView?.center.y = ( self.outerView?.bounds.size.height ?? 0 ) * 2
                     self.staticImageView?.alpha = 0
                 }, completion: { done in
-					if false == self.toggleStatic {
-						self.startAnimation()
-					}
+
                 })
             }
         }
@@ -724,38 +694,6 @@ internal struct SecureEntryConstants {
 						}
 					}
 				}
-				
-				if scanAnimBox == nil {
-					var boxRect = retRect;
-					boxRect.origin.x = 0
-					boxRect.size.width = SecureEntryConstants.Keys.ScanBoxWidth
-					boxRect.size.height += 0
-					scanAnimBox = UIView(frame: boxRect)
-					scanAnimBox?.isHidden = true
-					
-					if let scanAnimBox = scanAnimBox {
-						scanAnimBox.backgroundColor = (brandingColorInternal ?? UIColor.blue).withAlphaComponent(0.5)
-						scanAnimBox.center.y = outerView.bounds.height / 2.0
-						scanAnimBox.translatesAutoresizingMaskIntoConstraints = false
-						outerView.addSubview(scanAnimBox)
-					}
-				}
-				
-				if scanAnimLine == nil {
-					var lineRect = retRect;
-					lineRect.origin.x = 3
-					lineRect.size.width = SecureEntryConstants.Keys.ScanLineWidth
-					lineRect.size.height += 16
-					scanAnimLine = UIView(frame: lineRect)
-					scanAnimLine?.isHidden = true
-					
-					if let scanAnimLine = scanAnimLine {
-						scanAnimLine.backgroundColor = (brandingColorInternal ?? UIColor.blue)
-						scanAnimLine.center.y = outerView.bounds.height / 2.0
-						scanAnimLine.translatesAutoresizingMaskIntoConstraints = false
-						outerView.addSubview(scanAnimLine)
-					}
-				}
 			}
 		}
 		
@@ -772,57 +710,6 @@ internal struct SecureEntryConstants {
 		self.fullMessage = "THIS IS A SAMPLE SECURE ENTRY VALUE (Unique ID: \(Date().description(with: Locale.current).hashValue))"
 		self.start()
 		#endif // TARGET_INTERFACE_BUILDER
-	}
-	
-	@objc fileprivate func startAnimation() {
-		if scanAnimBox != nil {
-            guard let entryData = self.entryData, entryData.getSegmentType() == .ROTATING_SYMBOLOGY, let scanAnimBox = self.scanAnimBox, let scanAnimLine = self.scanAnimLine, let retImageView = self.retImageView else {
-                self.scanAnimBox?.isHidden = true
-                self.scanAnimLine?.isHidden = true
-                return
-            }
-			
-			if self.toggleStatic == false {
-				scanAnimBox.isHidden = false
-				scanAnimLine.isHidden = false
-			}
-			
-			if scanAnimBox.layer.animationKeys() == nil || scanAnimLine.layer.animationKeys() == nil {
-				scanAnimBox.layer.removeAllAnimations()
-				scanAnimLine.layer.removeAllAnimations()
-				
-				scanAnimBox.center.x = scanAnimBox.frame.size.width / 2
-				scanAnimLine.center.x = scanAnimBox.frame.size.width / 2
-				UIView.animate(withDuration: SecureEntryConstants.Keys.ScanAnimDuration, delay: SecureEntryConstants.Keys.ScanAnimStartDelay + SecureEntryConstants.Keys.ScanBoxAnimStartDelay, options: [.curveEaseInOut, .repeat, .autoreverse], animations: {
-					scanAnimBox.center.x = retImageView.frame.size.width - ( scanAnimBox.frame.size.width / 2 )
-				}, completion: nil)
-				UIView.animate(withDuration: SecureEntryConstants.Keys.ScanAnimDuration, delay: SecureEntryConstants.Keys.ScanAnimStartDelay, options: [.curveEaseInOut, .repeat, .autoreverse], animations: {
-					scanAnimLine.center.x = retImageView.frame.size.width - ( scanAnimBox.frame.size.width / 2 )
-				}, completion: nil)
-				
-				/*UIView.animateKeyframes(withDuration: SecureEntryConstants.Keys.ScanAnimDuration, delay: 0.05, options: [.calculationModeLinear, .repeat, .autoreverse, .overrideInheritedDuration], animations: {
-				UIView.addKeyframe(withRelativeStartTime: 0.0, relativeDuration: 0.0) { self.scanAnimBox.center.x = self.scanAnimBox.frame.size.width / 2 }
-				UIView.addKeyframe(withRelativeStartTime: 0.01, relativeDuration: 0.25) { self.scanAnimBox.center.x = self.scanAnimBox.frame.size.width / 2 }
-				UIView.addKeyframe(withRelativeStartTime: 0.25, relativeDuration: 0.5) { self.scanAnimBox.center.x = self.retImageView?.frame?.size.width - ( self.scanAnimBox.frame.size.width / 2 ) }
-				})
-				
-				UIView.animateKeyframes(withDuration: SecureEntryConstants.Keys.ScanAnimDuration, delay: 0, options: [.calculationModeLinear, .repeat, .autoreverse, .overrideInheritedDuration], animations: {
-				UIView.addKeyframe(withRelativeStartTime: 0.0, relativeDuration: 0.0) { self.scanAnimLine.center.x = self.scanAnimBox.frame.size.width / 2 }
-				UIView.addKeyframe(withRelativeStartTime: 0.01, relativeDuration: 0.25) { self.scanAnimLine.center.x = self.scanAnimBox.frame.size.width / 2 }
-				UIView.addKeyframe(withRelativeStartTime: 0.25, relativeDuration: 0.5) { self.scanAnimLine.center.x = self.retImageView?.frame?.size.width - ( self.scanAnimBox.frame.size.width / 2 ) }
-				})*/
-			}
-		}
-	}
-	
-	@objc fileprivate func stopAnimation() {
-		guard let scanAnimBox = self.scanAnimBox, let scanAnimLine = self.scanAnimLine else {
-			return
-		}
-		DispatchQueue.main.async {
-			scanAnimBox.layer.removeAllAnimations()
-			scanAnimLine.layer.removeAllAnimations()
-		}
 	}
 	
 	@objc fileprivate func update() {
@@ -885,9 +772,6 @@ internal struct SecureEntryConstants {
             self?.update()
         })
 		self.timer?.tolerance = 0.25
-		DispatchQueue.main.async {
-			self.startAnimation()
-		}
 	}
 	
 	@objc fileprivate func resume() {
@@ -899,6 +783,5 @@ internal struct SecureEntryConstants {
 	@objc fileprivate func stop() {
         self.timer?.invalidate()
 		self.timer = nil
-        self.stopAnimation()
 	}
 }
