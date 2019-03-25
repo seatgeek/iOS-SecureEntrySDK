@@ -610,6 +610,10 @@ internal struct SecureEntryConstants {
 						retImageView.centerXAnchor.constraint(equalTo: outerView.centerXAnchor).isActive = true
 						retImageView.centerYAnchor.constraint(equalTo: outerView.centerYAnchor).isActive = true
 					}
+
+                    if scanningView.superview == nil {
+                        retImageView?.addSubview(scanningView)
+                    }
 				}
 				
 				if errorView != nil {} else {
@@ -752,6 +756,17 @@ internal struct SecureEntryConstants {
 		}
         invalidateIntrinsicContentSize()
         onContentSizeChange?()
+
+        if let retImageView = retImageView {
+            var scanningViewFrame = scanningView.frame
+            scanningViewFrame.size.height = retImageView.frame.size.height
+            scanningView.frame = scanningViewFrame
+
+            if scanningView.layer.animation(forKey: "slide") == nil, retImageView.frame.size.width > 0 {
+                let animation = scanningAnimation
+                scanningView.layer.add(animation, forKey: "slide")
+            }
+        }
 	}
 	
 	@objc fileprivate func start() {
@@ -774,4 +789,45 @@ internal struct SecureEntryConstants {
 	}
 
     public var onContentSizeChange: (() -> ())?
+
+    var scanningAnimation: CAAnimation {
+        let parentWidth = retImageView?.frame.size.width ?? scanningView.frame.size.width
+        let left = 0
+        let right = parentWidth - scanningView.frame.size.width
+        let duration = 1.5
+        let timing = CAMediaTimingFunction(controlPoints: 0.25, 0.1, 0.2, 1)
+        let delay = 0.75
+
+        let leftToRightAnimation = CABasicAnimation(keyPath: "position.x")
+        leftToRightAnimation.fromValue = left
+        leftToRightAnimation.toValue = right
+        leftToRightAnimation.duration = duration
+        leftToRightAnimation.timingFunction = timing
+        leftToRightAnimation.beginTime = delay
+        leftToRightAnimation.fillMode = .forwards
+
+        let rightToLeftAnimation = CABasicAnimation(keyPath: "position.x")
+        rightToLeftAnimation.fromValue = right
+        rightToLeftAnimation.toValue = left + 2
+        rightToLeftAnimation.duration = duration
+        rightToLeftAnimation.timingFunction = timing
+        rightToLeftAnimation.beginTime = leftToRightAnimation.beginTime + leftToRightAnimation.duration + delay
+        rightToLeftAnimation.fillMode = .forwards
+
+        let animationGroup = CAAnimationGroup()
+        animationGroup.animations = [leftToRightAnimation, rightToLeftAnimation]
+        animationGroup.duration = delay + duration + delay + duration
+        animationGroup.repeatCount = .infinity
+
+        return animationGroup
+    }
+
+    lazy var scanningView: UIView = {
+        let view = UIView()
+        view.backgroundColor = .black
+        view.alpha = 0.4
+        view.frame = CGRect(x: 0, y: 0, width: 4, height: 0)
+        view.layer.cornerRadius = 2
+        return view
+    }()
 }
