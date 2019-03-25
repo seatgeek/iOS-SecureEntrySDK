@@ -40,11 +40,11 @@ extension String {
 
 internal struct SecureEntryConstants {
 	struct Keys {
-		static let MinOuterWidth = CGFloat(216.0)
+		static let MinOuterWidth = CGFloat(247)
 		static let MinOuterHeight = CGFloat(160.0)
-		static let MinRetWidth = CGFloat(200.0)
+		static let MinRetWidth = CGFloat(247)
 		static let MinRetHeight = CGFloat(50.0)
-		static let MinStaticWidthHeight = CGFloat(120.0)
+		static let MinStaticWidthHeight = CGFloat(126.0)
 		static let MinErrorWidth = CGFloat(200.0)
 		static let MinErrorHeight = CGFloat(120.0)
 		
@@ -59,7 +59,7 @@ internal struct SecureEntryConstants {
 		
 		static let ToggleButtonMargin = CGFloat(-3.0)
 		static let ToggleButtonWidthHeight = CGFloat(30.0)
-		static let ToggleAnimDuration = Double(0.3)
+		static let ToggleAnimDuration = Double(0.0)
 	}
 	
 	struct Strings {
@@ -102,11 +102,10 @@ internal struct SecureEntryConstants {
 	fileprivate var staticOnlyInternal: Bool = false
 	fileprivate var brandingColorInternal: UIColor?
 	fileprivate let timeInterval: TimeInterval = 15
-	fileprivate var outerView: UIImageView?
+	fileprivate var outerView: UIView?
 	fileprivate var loadingImageView: UIImageView? //= WKWebView(frame: CGRect(x: 0, y: 0, width: 1, height: 1))
 	fileprivate var retImageView: UIImageView?
 	fileprivate var staticImageView: UIImageView?
-	fileprivate var toggleButton: UIButton?
 	fileprivate var toggleStatic: Bool = false
 	fileprivate var errorView: UIView?
 	fileprivate var errorIcon: UIImageView?
@@ -144,6 +143,15 @@ internal struct SecureEntryConstants {
 			self.brandingColorInternal = newValue
 		}
 	}
+
+    override public var intrinsicContentSize: CGSize {
+        if let imageView = retImageView, imageView.image != nil, !imageView.isHidden, imageView.alpha > 0 {
+            return imageView.frame.size
+        } else if let imageView = staticImageView {
+            return imageView.frame.size
+        }
+        return self.frame.size
+    }
 	
 	enum BarcodeType {
 		
@@ -204,34 +212,32 @@ internal struct SecureEntryConstants {
 		self.setToken(token: token, errorText: nil)
 	}
 	public func setToken( token: String!, errorText: String? ) {
-		DispatchQueue.main.async {
-			guard ( self.originalToken == nil || self.originalToken != token ) else {
-				self.start()
-				return
-			}
-			
-			// Parse token from supplied payload
-			self.originalToken = token
-			if token != nil {
-				let newEntryData = EntryData(tokenString: token)
-				
-				// Stop renderer
-				//self.stop()
-				
-				guard (newEntryData.getSegmentType() == .BARCODE || newEntryData.getSegmentType() == .ROTATING_SYMBOLOGY) else {
-					self.showError( text: errorText ?? SecureEntryConstants.Strings.DefaultErrorText, icon: nil )
-					return
-				}
-				
-				self.entryData = newEntryData
-				
-				self.setupView()
-				self.update()
-				self.start()
-			} else {
-				self.showError( text: errorText ?? SecureEntryConstants.Strings.DefaultErrorText, icon: nil )
-			}
-		}
+        guard ( self.originalToken == nil || self.originalToken != token ) else {
+            self.start()
+            return
+        }
+
+        // Parse token from supplied payload
+        self.originalToken = token
+        if token != nil {
+            let newEntryData = EntryData(tokenString: token)
+
+            // Stop renderer
+            //self.stop()
+
+            guard (newEntryData.getSegmentType() == .BARCODE || newEntryData.getSegmentType() == .ROTATING_SYMBOLOGY) else {
+                self.showError( text: errorText ?? SecureEntryConstants.Strings.DefaultErrorText, icon: nil )
+                return
+            }
+
+            self.entryData = newEntryData
+
+            self.setupView()
+            self.update()
+            self.start()
+        } else {
+            self.showError( text: errorText ?? SecureEntryConstants.Strings.DefaultErrorText, icon: nil )
+        }
 	}
 	
 	public func setBrandingColor( color: UIColor! ) {
@@ -368,25 +374,35 @@ internal struct SecureEntryConstants {
 				// Generate & scale the RET barcode (PDF417)
 				if let retFilter = CIFilter(name: "CIPDF417BarcodeGenerator") {
 					retFilter.setValue(fullMessage.dataUsingUTF8StringEncoding, forKey: "inputMessage")
-					if let scaled = retFilter.outputImage?.transformed(by: CGAffineTransform(scaleX: 5.0, y: 5.0)) {
-						let image = UIImage(ciImage: scaled, scale: 2.0, orientation: .up)
-						
-						// Add inset padding
-						let scaleFactor = ( SecureEntryConstants.Keys.MinRetWidth + ( SecureEntryConstants.Keys.RetBorderWidth * 2 ) ) / retImageView.frame.width
-						let insetValue = SecureEntryConstants.Keys.RetBorderWidth * scaleFactor
-						let insets = UIEdgeInsets(top: insetValue, left: insetValue, bottom: insetValue, right: insetValue)
-						UIGraphicsBeginImageContextWithOptions( CGSize(width: image.size.width + insets.left + insets.right, height: image.size.height + insets.top + insets.bottom), false, image.scale)
-						let _ = UIGraphicsGetCurrentContext()
-						let origin = CGPoint(x: insets.left, y: insets.top)
-						image.draw(at: origin)
-						let imageWithInsets = UIGraphicsGetImageFromCurrentImageContext()
-						UIGraphicsEndImageContext()
-						
-						// Apply the image
-						retImageView.image = imageWithInsets
-						
-						self.flipped = !self.flipped
-					} else {
+                    if let barcodeImage = retFilter.outputImage {
+                        let generatedImageSize = barcodeImage.extent.integral.size
+                        let maxSize = CGSize(width: 272, height: 54)
+
+                        let screenScale: CGFloat = 1 // SCREEN_SCALE if we need to, but if views are pixel aliged we won't
+                        let maxSizeInPixels = CGSize(width: maxSize.width * screenScale, height: maxSize.height * screenScale)
+                        var xScale: CGFloat = maxSizeInPixels.width / generatedImageSize.width
+                        let xSize = CGSize(width: generatedImageSize.width * xScale, height: generatedImageSize.height * xScale)
+                        if xSize.height > maxSizeInPixels.height {
+                            let furtherScale = maxSizeInPixels.height / xSize.height
+                            xScale *= furtherScale
+                        }
+
+                        var yScale = maxSizeInPixels.height / generatedImageSize.height
+                        let ySize = CGSize(width: generatedImageSize.width * yScale, height: generatedImageSize.height * yScale)
+                        if ySize.width > maxSizeInPixels.width {
+                            let furtherScale = maxSizeInPixels.width / ySize.width
+                            yScale *= furtherScale
+                        }
+
+                        let scale = min(xScale, yScale)
+                        let imageByTransform = barcodeImage.transformed(by: CGAffineTransform(scaleX: scale, y: scale))
+                        let image =  UIImage(ciImage: imageByTransform)
+
+                        // Apply the image
+                        retImageView.image = image
+
+                        self.flipped = !self.flipped
+                    } else {
 						retImageView.image = nil
 						return
 					}
@@ -426,7 +442,7 @@ internal struct SecureEntryConstants {
 		}
 	}
 	
-	@objc fileprivate func toggleMode(_ sender: AnyObject) {
+	@objc public func toggleMode(_ sender: AnyObject) {
 		// Only rotating symbology may be toggled
 		if self.entryData?.getSegmentType() == .ROTATING_SYMBOLOGY {
 			self.toggleStatic = !self.toggleStatic
@@ -443,11 +459,9 @@ internal struct SecureEntryConstants {
         // Only rotating symbology may be toggled
         if self.entryData?.getSegmentType() == .ROTATING_SYMBOLOGY {
             if true == self.toggleStatic {
-                self.toggleButton?.setImage(UIImage(named: "Swap", in: Bundle(for: SecureEntryView.self), compatibleWith: nil), for: .normal)
                 self.update()
                 self.retImageView?.isHidden = false
                 self.retImageView?.alpha = 1
-                self.retImageView?.center.y = ( self.outerView?.bounds.size.height ?? 0 ) / 2
                 self.staticImageView?.isHidden = false
                 self.staticImageView?.alpha = 0
                 self.staticImageView?.center.y = ( self.outerView?.bounds.size.height ?? 0 ) * 2
@@ -455,7 +469,6 @@ internal struct SecureEntryConstants {
                                usingSpringWithDamping: 0.7,
                                initialSpringVelocity: 1.0,
                                options: [.curveEaseOut], animations: {
-                    self.retImageView?.center.y = ( self.outerView?.bounds.size.height ?? 0 ) * 2
                     self.retImageView?.alpha = 0
                     
                     self.staticImageView?.center.y = ( self.outerView?.bounds.size.height ?? 0 ) / 2
@@ -467,11 +480,9 @@ internal struct SecureEntryConstants {
 					}
                 })
             } else {
-                self.toggleButton?.setImage(UIImage(named: "Overflow", in: Bundle(for: SecureEntryView.self), compatibleWith: nil), for: .normal)
                 self.update()
                 self.retImageView?.isHidden = false
                 self.retImageView?.alpha = 0
-                self.retImageView?.center.y = ( self.outerView?.bounds.size.height ?? 0 ) * 2
                 self.staticImageView?.isHidden = false
                 self.staticImageView?.alpha = 1
                 self.staticImageView?.center.y = ( self.outerView?.bounds.size.height ?? 0 ) / 2
@@ -479,7 +490,6 @@ internal struct SecureEntryConstants {
                                 usingSpringWithDamping: 0.7,
                                 initialSpringVelocity: 1.0,
                                 options: [.curveEaseOut], animations: {
-                    self.retImageView?.center.y = ( self.outerView?.bounds.size.height ?? 0 ) / 2
                     self.retImageView?.alpha = 1
                     
                     self.staticImageView?.center.y = ( self.outerView?.bounds.size.height ?? 0 ) * 2
@@ -521,7 +531,7 @@ internal struct SecureEntryConstants {
 		buttonRect.origin.y = outerRect.size.height - ( buttonRect.size.height + SecureEntryConstants.Keys.ToggleButtonMargin )
 		
 		if outerView != nil {} else {
-			outerView = UIImageView(frame: outerRect);
+			outerView = UIView(frame: outerRect);
 			if let outerView = outerView {
 				outerView.layer.masksToBounds = true
 				self.addSubview(outerView)
@@ -585,39 +595,20 @@ internal struct SecureEntryConstants {
 				}
 				
 				if retImageView != nil {} else {
-					retImageView = UIImageView(frame: retRect)
+					retImageView = UIImageView()
 					if let retImageView = retImageView {
 						retImageView.layer.masksToBounds = true
 						retImageView.layer.backgroundColor = UIColor.white.cgColor
-						retImageView.layer.borderWidth = 0
-						retImageView.layer.cornerRadius = 4
 						retImageView.isHidden = true
+                        retImageView.setContentCompressionResistancePriority(.required, for: .horizontal)
+                        retImageView.setContentCompressionResistancePriority(.required, for: .vertical)
+                        retImageView.setContentHuggingPriority(.required, for: .horizontal)
+                        retImageView.setContentHuggingPriority(.required, for: .vertical)
 						outerView.addSubview(retImageView)
-						
-						retImageView.center.x = self.bounds.width / 2.0
-						retImageView.center.y = self.bounds.height / 2.0
+
 						retImageView.translatesAutoresizingMaskIntoConstraints = false
-						retImageView.widthAnchor.constraint(equalToConstant: retRect.width).isActive = true
-						retImageView.heightAnchor.constraint(equalToConstant: retRect.height).isActive = true
 						retImageView.centerXAnchor.constraint(equalTo: outerView.centerXAnchor).isActive = true
 						retImageView.centerYAnchor.constraint(equalTo: outerView.centerYAnchor).isActive = true
-					}
-				}
-				
-				if toggleButton != nil {} else {
-					toggleButton = UIButton(frame: buttonRect)
-					if let toggleButton = toggleButton, let retView = retImageView {
-						toggleButton.layer.masksToBounds = true
-						toggleButton.setImage(UIImage(named: "Overflow", in: Bundle(for: SecureEntryView.self), compatibleWith: nil), for: .normal)
-						toggleButton.addTarget(self, action: #selector(self.toggleMode), for: .touchUpInside)
-						toggleButton.isHidden = true
-						self.addSubview(toggleButton)
-						
-                        toggleButton.translatesAutoresizingMaskIntoConstraints = false
-                        toggleButton.widthAnchor.constraint(equalToConstant: SecureEntryConstants.Keys.ToggleButtonWidthHeight).isActive = true
-                        toggleButton.heightAnchor.constraint(equalToConstant: SecureEntryConstants.Keys.ToggleButtonWidthHeight).isActive = true
-                        toggleButton.trailingAnchor.constraint(equalTo: retView.trailingAnchor, constant: -SecureEntryConstants.Keys.ToggleButtonMargin).isActive = true
-                        toggleButton.bottomAnchor.constraint(equalTo: outerView.bottomAnchor, constant: -SecureEntryConstants.Keys.ToggleButtonMargin).isActive = true
 					}
 				}
 				
@@ -719,7 +710,6 @@ internal struct SecureEntryConstants {
 		
 		retImageView?.isHidden = true
 		staticImageView?.isHidden = true
-		toggleButton?.isHidden = true
 		errorView?.isHidden = true
 		
 		if ( self.toggleStatic == false ) && ( self.entryData?.getSegmentType() == .ROTATING_SYMBOLOGY ) {
@@ -734,7 +724,6 @@ internal struct SecureEntryConstants {
 			
 			retImageView?.isHidden = false
 			loadingImageView?.isHidden = true
-			toggleButton?.isHidden = false
 			
 			// Get simple barcoee message
 			staticMessage = self.entryData?.getBarcode()
@@ -757,13 +746,12 @@ internal struct SecureEntryConstants {
 		} else if ( self.toggleStatic == true ) || ( entryData.getSegmentType() == .BARCODE ) {
 			staticImageView?.isHidden = false
 			loadingImageView?.isHidden = true
-			if self.toggleStatic == true {
-				toggleButton?.isHidden = false
-			}
 			staticMessage = self.entryData?.getBarcode()
 		} else {
 			errorView?.isHidden = false
 		}
+        invalidateIntrinsicContentSize()
+        onContentSizeChange?()
 	}
 	
 	@objc fileprivate func start() {
@@ -784,4 +772,6 @@ internal struct SecureEntryConstants {
         self.timer?.invalidate()
 		self.timer = nil
 	}
+
+    public var onContentSizeChange: (() -> ())?
 }
