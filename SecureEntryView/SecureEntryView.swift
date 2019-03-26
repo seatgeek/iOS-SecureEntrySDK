@@ -330,7 +330,7 @@ internal struct SecureEntryConstants {
                         UIGraphicsEndImageContext()
                         
                         // Apply the image
-                        qrImageView.layer.magnificationFilter = kCAFilterNearest
+                        qrImageView.layer.magnificationFilter = CALayerContentsFilter.nearest
                         qrImageView.image = imageWithInsets
                     }
                 }
@@ -386,7 +386,7 @@ internal struct SecureEntryConstants {
                         UIGraphicsEndImageContext()
                         
                         // Apply the image
-                        pdfImageView.layer.magnificationFilter = kCAFilterNearest
+                        pdfImageView.layer.magnificationFilter = CALayerContentsFilter.nearest
                         pdfImageView.image = imageWithInsets
                     }
                     
@@ -428,7 +428,7 @@ internal struct SecureEntryConstants {
                         UIGraphicsEndImageContext()
                         
                         // Apply the image
-                        qrImageView.layer.magnificationFilter = kCAFilterNearest
+                        qrImageView.layer.magnificationFilter = CALayerContentsFilter.nearest
                         qrImageView.image = imageWithInsets
                     }
                 }
@@ -531,8 +531,8 @@ internal struct SecureEntryConstants {
 		outerRect.size.height = max(SecureEntryConstants.Keys.MinOuterHeight, outerRect.size.height)
 		let sizeFactor = SecureEntryConstants.Keys.MinOuterWidth / outerRect.size.width
 
-		retRect.size.width = max(SecureEntryConstants.Keys.MinRetWidth, outerRect.size.width)
-		retRect.size.height = max(SecureEntryConstants.Keys.MinRetHeight, retRect.size.width / 4.0)
+		retRect.size.width = max(SecureEntryConstants.Keys.MinPDFWidth, outerRect.size.width)
+		retRect.size.height = max(SecureEntryConstants.Keys.MinPDFHeight, retRect.size.width / 4.0)
 		
 		staticRect.size.width = max(SecureEntryConstants.Keys.MinQRWidthHeight, outerRect.size.height)
 		staticRect.size.height = max(SecureEntryConstants.Keys.MinQRWidthHeight, staticRect.size.width)
