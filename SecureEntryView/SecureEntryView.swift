@@ -40,9 +40,9 @@ extension String {
 
 internal struct SecureEntryConstants {
 	struct Keys {
-		static let MinOuterWidth = CGFloat(216.0)
+		static let MinOuterWidth = CGFloat(247.0)
 		static let MinOuterHeight = CGFloat(160.0)
-		static let MinPDFWidth = CGFloat(200.0)
+		static let MinPDFWidth = CGFloat(247.0)
 		static let MinPDFHeight = CGFloat(50.0)
 		static let MinQRWidthHeight = CGFloat(120.0)
 		static let MinErrorWidth = CGFloat(200.0)
@@ -913,6 +913,7 @@ public class SGSecureEntryView: SecureEntryView {
         scanAnimBox?.removeFromSuperview()
         scanAnimLine?.removeFromSuperview()
         pdfImageView?.addSubview(scanningView)
+        pdfImageView?.layer.cornerRadius = 0
     }
 
     override fileprivate func update() {
