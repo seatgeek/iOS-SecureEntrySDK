@@ -548,7 +548,7 @@ internal struct SecureEntryConstants {
 		if outerView != nil {} else {
 			outerView = UIImageView(frame: outerRect);
 			if let outerView = outerView {
-				outerView.layer.masksToBounds = true
+				outerView.layer.masksToBounds = false
 				self.addSubview(outerView)
 				
 				outerView.center.x = self.bounds.width / 2.0
@@ -612,7 +612,7 @@ internal struct SecureEntryConstants {
 				if pdfImageView != nil {} else {
 					pdfImageView = UIImageView(frame: retRect)
 					if let pdfImageView = pdfImageView {
-						pdfImageView.layer.masksToBounds = true
+						pdfImageView.layer.masksToBounds = false
 						pdfImageView.layer.backgroundColor = UIColor.white.cgColor
 						pdfImageView.layer.borderWidth = 0
 						pdfImageView.layer.cornerRadius = 4
@@ -960,41 +960,44 @@ public class SGSecureEntryView: SecureEntryView {
 
     var scanningAnimation: CAAnimation {
         let parentWidth = pdfImageView?.frame.size.width ?? scanningView.frame.size.width
-        let left = 0
-        let right = parentWidth - scanningView.frame.size.width
-        let duration = 1.5
-        let timing = CAMediaTimingFunction(controlPoints: 0.25, 0.1, 0.2, 1)
-        let delay = 0.75
+        let left = scanningView.frame.size.width * -2
+        let right = parentWidth + scanningView.frame.size.width
+        let delay = 1.25
+        let tension: CGFloat = 30
+        let friction: CGFloat = 22
 
-        let leftToRightAnimation = CABasicAnimation(keyPath: "position.x")
+        let leftToRightAnimation = CASpringAnimation(keyPath: "position.x")
         leftToRightAnimation.fromValue = left
         leftToRightAnimation.toValue = right
-        leftToRightAnimation.duration = duration
-        leftToRightAnimation.timingFunction = timing
+        leftToRightAnimation.stiffness = tension
+        leftToRightAnimation.damping = friction
         leftToRightAnimation.beginTime = delay
+        leftToRightAnimation.duration = leftToRightAnimation.settlingDuration
         leftToRightAnimation.fillMode = .forwards
 
-        let rightToLeftAnimation = CABasicAnimation(keyPath: "position.x")
+        let rightToLeftAnimation = CASpringAnimation(keyPath: "position.x")
         rightToLeftAnimation.fromValue = right
         rightToLeftAnimation.toValue = left + 2
-        rightToLeftAnimation.duration = duration
-        rightToLeftAnimation.timingFunction = timing
+        rightToLeftAnimation.stiffness = tension
+        rightToLeftAnimation.damping = friction
         rightToLeftAnimation.beginTime = leftToRightAnimation.beginTime + leftToRightAnimation.duration + delay
+        rightToLeftAnimation.duration = rightToLeftAnimation.settlingDuration
         rightToLeftAnimation.fillMode = .forwards
 
         let animationGroup = CAAnimationGroup()
         animationGroup.animations = [leftToRightAnimation, rightToLeftAnimation]
-        animationGroup.duration = delay + duration + delay + duration
+        animationGroup.duration = rightToLeftAnimation.beginTime + rightToLeftAnimation.duration
         animationGroup.repeatCount = .infinity
 
         return animationGroup
     }
 
-    lazy var scanningView: UIView = {
+    public private(set) lazy var scanningView: UIView = {
         let view = UIView()
         view.backgroundColor = .black
         view.alpha = 0.4
-        view.frame = CGRect(x: 0, y: 0, width: 4, height: 0)
+        let width = 4
+        view.frame = CGRect(x: width * -2, y: 0, width: width, height: 0)
         view.layer.cornerRadius = 2
         return view
     }()
