@@ -42,9 +42,9 @@ extension SecureEntryView {
       toggled: Bool
     )
     
-    case error(message: String, icon: UIImage)
+    case error(message: String, icon: UIImage?)
     
-    case customError(messsage: String, icon: UIImage)
+    case customError(messsage: String, icon: UIImage?)
     
     func update(_ view: SecureEntryView) {
       view.barcodeView.imageView.image = nil
@@ -103,7 +103,7 @@ extension SecureEntryView {
 // MARK: - Changing state
 extension SecureEntryView.State {
   
-  typealias Error = (message: String, icon: UIImage)
+  typealias Error = (message: String, icon: UIImage?)
 
   func reset() -> SecureEntryView.State {
     return .none

@@ -26,7 +26,7 @@ extension UIImage {
   
   private static let bundle = Bundle(for: SecureEntryView.self)
 
-  static var alert: UIImage { return UIImage(named: "Alert", in: bundle, compatibleWith: nil)! }
+  static var alert: UIImage? { return UIImage(named: "Alert", in: bundle, compatibleWith: nil) }
 }
 
 // MARK: - Loading image

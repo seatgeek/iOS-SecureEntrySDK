@@ -21,7 +21,7 @@
 import UIKit
 
 @IBDesignable
-public final class SecureEntryView: UIView {
+public class SecureEntryView: UIView {
   
   // MARK: Public variables
 
@@ -225,6 +225,66 @@ public final class SecureEntryView: UIView {
     
     token = "eyJiIjoiMDg2NzM0NjQ3NjA0MTYxNmEiLCJ0IjoiQkFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFDR2tmNWxkZWZ3WEh3WmpvRmMzcnNEY0RINkpyY2pqOW0yS0liKyIsImNrIjoiNjhhZjY5YTRmOWE2NGU0YTkxZmE0NjBiZGExN2Y0MjciLCJlayI6IjA2ZWM1M2M3NDllNDQ3YTQ4ODAyNTdmNzNkYzNhYmZjIiwicnQiOiJyb3RhdGluZ19zeW1ib2xvZ3kifQ=="
   }
+
+    // MARK: - SeatGeek Overrides
+
+    func setupView() {
+        // Kick off a single clock sync (this will be ignored if clock already synced)
+        SecureEntryView.syncTime()
+
+        addSubviews()
+        makeConstraints()
+        update()
+    }
+
+    func update() {
+        switch entryData {
+        case .none:
+            state = state.reset()
+
+            UIImage.getLoading { [weak self] (image) in
+                guard let this = self else { return }
+                this.loadingImage = image
+                this.state = this.state.setLoadingImage(image)
+                if case .loading = this.state {
+                    UIAccessibility.post(notification: .layoutChanged, argument: nil)
+                }
+            }
+
+        case .some(.invalid):
+            state = state.showError((message: errorMessage, icon: .alert))
+
+        case .some(.rotatingPDF417(let token, let customerKey, let eventKey, let barcode)):
+            let value = generateRotatingPDF417Value(
+                token: token,
+                customerKey: customerKey,
+                eventKey: eventKey
+            )
+
+            state = state.showRotatingPDF417(
+                rotatingBarcode: value,
+                barcode: barcode,
+                pdf417Subtitle: pdf417Subtitle,
+                qrSubtitle: qrSubtitle,
+                error: (message: errorMessage, icon: .alert)
+            )
+
+        case .some(.staticPDF417(let barcode)):
+            state = state.showStaticPDF417(
+                barcode: barcode,
+                pdf417Subtitle: pdf417Subtitle,
+                qrSubtitle: qrSubtitle,
+                error: (message: errorMessage, icon: .alert)
+            )
+
+        case .some(.qrCode(let barcode)):
+            state = state.showQRCode(
+                barcode: barcode,
+                subtitle: qrSubtitle,
+                error: (message: errorMessage, icon: .alert)
+            )
+        }
+    }
 }
 
 // MARK: - Public Methods
@@ -248,15 +308,6 @@ public extension SecureEntryView {
 
 // MARK: - Internal Methods
 extension SecureEntryView {
-  
-  func setupView() {
-    // Kick off a single clock sync (this will be ignored if clock already synced)
-    SecureEntryView.syncTime()
-    
-    addSubviews()
-    makeConstraints()
-    update()
-  }
   
   func addSubviews() {
     addSubview(barcodeView)
@@ -313,55 +364,6 @@ extension SecureEntryView {
     }
   }
   
-  func update() {
-    switch entryData {
-    case .none:
-      state = state.reset()
-      
-      UIImage.getLoading { [weak self] (image) in
-        guard let this = self else { return }
-        this.loadingImage = image
-        this.state = this.state.setLoadingImage(image)
-        if case .loading = this.state {
-          UIAccessibility.post(notification: .layoutChanged, argument: nil)
-        }
-      }
-      
-    case .some(.invalid):
-      state = state.showError((message: errorMessage, icon: .alert))
-      
-    case .some(.rotatingPDF417(let token, let customerKey, let eventKey, let barcode)):
-      let value = generateRotatingPDF417Value(
-        token: token,
-        customerKey: customerKey,
-        eventKey: eventKey
-      )
-      
-      state = state.showRotatingPDF417(
-        rotatingBarcode: value,
-        barcode: barcode,
-        pdf417Subtitle: pdf417Subtitle,
-        qrSubtitle: qrSubtitle,
-        error: (message: errorMessage, icon: .alert)
-      )
-      
-    case .some(.staticPDF417(let barcode)):
-      state = state.showStaticPDF417(
-        barcode: barcode,
-        pdf417Subtitle: pdf417Subtitle,
-        qrSubtitle: qrSubtitle,
-        error: (message: errorMessage, icon: .alert)
-      )
-      
-    case .some(.qrCode(let barcode)):
-      state = state.showQRCode(
-        barcode: barcode,
-        subtitle: qrSubtitle,
-        error: (message: errorMessage, icon: .alert)
-      )
-    }
-  }
-  
   @objc
   func toggle(_ sender: Any) {
     self.state = self.state.toggle()
@@ -402,4 +404,115 @@ private extension SecureEntryView {
     }
     return keys.joined(separator: "::")
   }
+}
+
+public class SGSecureEntryView: SecureEntryView {
+
+    // MARK: - Overrides
+    override func setupView() {
+        super.setupView()
+        pdf417Subtitle = ""
+        qrSubtitle = ""
+        toggleButton.removeFromSuperview()
+        scanAnimationView.removeFromSuperview()
+        barcodeView.addSubview(scanningView)
+        barcodeView.layer.cornerRadius = 0
+    }
+
+    override func update() {
+        super.update()
+        invalidateIntrinsicContentSize()
+        onContentSizeChange?()
+
+        let shouldShowAnimation = isShowingPDFBarcode
+
+        guard shouldShowAnimation else {
+            scanningView.alpha = 0
+            return
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            guard let self = self else { return }
+            var scanningViewFrame = self.scanningView.frame
+            scanningViewFrame.size.height = self.barcodeView.frame.size.height
+            self.scanningView.frame = scanningViewFrame
+
+            if self.scanningView.layer.animation(forKey: "slide") == nil,
+                self.barcodeView.frame.size.width > 0 {
+
+                let animation = self.scanningAnimation
+                self.scanningView.layer.add(animation, forKey: "slide")
+            }
+
+            self.scanningView.alpha = 1
+        }
+    }
+
+    // MARK: - Fresh
+
+    var isShowingPDFBarcode: Bool {
+        switch state {
+        case .rotatingPDF417(_, _, _, _, _, let toggled):
+            return !toggled
+        case .staticPDF417(_, _, _):
+            return true
+        default:
+            return false
+        }
+    }
+
+    public var onContentSizeChange: (() -> ())?
+
+    override public var intrinsicContentSize: CGSize {
+        return isShowingPDFBarcode
+            ? CGSize(width: 220.0, height: 85.0)
+            : CGSize(width: 220.0, height: 160.0)
+    }
+
+    public func toggle() {
+        toggle(self)
+    }
+
+    var scanningAnimation: CAAnimation {
+        let parentWidth = barcodeView.frame.size.width
+        let left = scanningView.frame.size.width * -2
+        let right = parentWidth + scanningView.frame.size.width
+        let delay = 1.25
+        let tension: CGFloat = 30
+        let friction: CGFloat = 22
+
+        let leftToRightAnimation = CASpringAnimation(keyPath: "position.x")
+        leftToRightAnimation.fromValue = left
+        leftToRightAnimation.toValue = right
+        leftToRightAnimation.stiffness = tension
+        leftToRightAnimation.damping = friction
+        leftToRightAnimation.beginTime = delay
+        leftToRightAnimation.duration = leftToRightAnimation.settlingDuration
+        leftToRightAnimation.fillMode = .forwards
+
+        let rightToLeftAnimation = CASpringAnimation(keyPath: "position.x")
+        rightToLeftAnimation.fromValue = right
+        rightToLeftAnimation.toValue = left + 2
+        rightToLeftAnimation.stiffness = tension
+        rightToLeftAnimation.damping = friction
+        rightToLeftAnimation.beginTime = leftToRightAnimation.beginTime + leftToRightAnimation.duration + delay
+        rightToLeftAnimation.duration = rightToLeftAnimation.settlingDuration
+        rightToLeftAnimation.fillMode = .forwards
+
+        let animationGroup = CAAnimationGroup()
+        animationGroup.animations = [leftToRightAnimation, rightToLeftAnimation]
+        animationGroup.duration = rightToLeftAnimation.beginTime + rightToLeftAnimation.duration
+        animationGroup.repeatCount = .infinity
+
+        return animationGroup
+    }
+
+    public private(set) lazy var scanningView: UIView = {
+        let view = UIView()
+        view.backgroundColor = .black
+        let width = 4
+        view.frame = CGRect(x: width * -2, y: 0, width: width, height: 0)
+        view.layer.cornerRadius = 2
+        return view
+    }()
 }
