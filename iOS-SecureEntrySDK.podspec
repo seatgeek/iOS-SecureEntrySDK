@@ -1,7 +1,7 @@
 Pod::Spec.new do |spec|
 
   spec.name         = "iOS-SecureEntrySDK"
-  spec.version      = "1.0.7"
+  spec.version      = "1.0.8"
   spec.summary      = "TicketMaster iOS-SecureEntrySDK."
 
   spec.description  = "The SecureEntrySDK allows 3rd party apps and services to display Ticketmaster users’ secured tickets"
@@ -19,7 +19,8 @@ Pod::Spec.new do |spec|
 
   spec.swift_version = '4.2'
 
-  spec.source_files  = "SecureEntryView/*.{h,swift}", "OTP/3rdParty/*.swift", "OTP/3rdParty/CryptoSwift/**/*.swift", "OTP/TMSwiftOTP/**/*.{h,swift}" 
-  spec.exclude_files = "OTP/TMSwiftOTP/Tests/*"
+  spec.resources = 'Source/Resources/Media.xcassets'
+  spec.source_files  = "Source/**/*.{h,swift}"
+  spec.exclude_files = "Source/Externals/SwiftOTP/Tests/*"
 
 end
